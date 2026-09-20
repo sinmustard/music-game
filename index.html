@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>연애재판 — RHYTHM COURT</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="game"></canvas>
+
+  <!-- ================= HUD ================= -->
+  <div id="hud" class="hidden">
+    <div id="hudTop">
+      <div id="songBox">
+        <div class="t" id="hudSong">연애재판</div>
+        <div class="s" id="hudSub">40mP feat. 하츠네 미쿠</div>
+      </div>
+      <div id="scoreBox">
+        <div id="score">0</div>
+        <div id="timeNow">0:00</div>
+      </div>
+      <button id="pauseBtn" title="일시정지 (Esc)">❚❚</button>
+    </div>
+    <div id="lifeBar"><div id="lifeFill"></div></div>
+    <div id="progBar"><div id="progFill"></div></div>
+  </div>
+
+  <div id="countdown" class="hidden">3</div>
+
+  <!-- ================= 타이틀 ================= -->
+  <div id="titleScreen" class="screen">
+    <div class="card">
+      <div class="brand">
+        <h1>연애재판</h1>
+        <span class="sub">RHYTHM COURT · 6K</span>
+      </div>
+      <p class="credit">
+        원곡 <b>恋愛裁判 / 연애재판</b> — 40mP feat. 初音ミク ·
+        BPM 150 · 4/4 &nbsp;|&nbsp; 채보·엔진은 이 게임의 자체 제작물입니다.
+      </p>
+
+      <div class="grid">
+        <!-- 왼쪽: 음원 + 난이도 -->
+        <div>
+          <h3>1. 음원</h3>
+          <div id="dropZone">
+            <div class="big">🎵 음악 파일을 여기에 끌어다 놓기</div>
+            <div class="small">클릭해서 선택도 가능 · mp3 / ogg / wav / m4a<br>
+              (불러오지 않으면 <b>메트로놈 모드</b>로 플레이합니다)</div>
+            <div id="fileName"></div>
+          </div>
+          <input type="file" id="fileInput" accept="audio/*,.mp3,.ogg,.wav,.m4a,.flac" hidden>
+          <div class="note-box">
+            ⚖️ 저작권 때문에 곡 파일은 포함되어 있지 않습니다.
+            본인이 정식으로 구매·소장 중인 <b>恋愛裁判</b> 음원 파일을 직접 불러와 주세요.
+          </div>
+
+          <div style="margin-top:18px">
+            <h3>2. 채보 방식</h3>
+            <div class="radios">
+              <label><input type="radio" name="cmode" id="modeBuiltin" checked><span>내장 채보 (BPM 고정)</span></label>
+              <label><input type="radio" name="cmode" id="modeAuto" disabled><span>오디오 자동 분석</span></label>
+            </div>
+            <button class="btn" id="analyzeBtn" disabled style="width:100%;flex:none">
+              🔍 불러온 음원 분석해서 채보 생성
+            </button>
+            <div class="small" style="font-size:11px;color:var(--dim);margin-top:7px;line-height:1.6">
+              <span id="audioState">음원 없음</span> · <span id="analyzeState">분석 전</span><br>
+              자동 분석은 실제 음원의 타격음을 찾아 16분 격자에 맞춰 노트를 깔기 때문에
+              곡과 정확히 맞아떨어집니다. (3~4분 곡 기준 5~15초 소요)
+            </div>
+          </div>
+
+          <div style="margin-top:18px">
+            <h3>3. 난이도</h3>
+            <div class="diffs">
+              <button class="diff-btn" data-diff="NORMAL">NORMAL<span class="lv">14</span></button>
+              <button class="diff-btn" data-diff="HARD">HARD<span class="lv">20</span></button>
+              <button class="diff-btn" data-diff="EXPERT">EXPERT<span class="lv">26</span></button>
+              <button class="diff-btn" data-diff="MASTER">MASTER<span class="lv">31</span></button>
+              <button class="diff-btn on" data-diff="APPEND">APPEND<span class="lv">35</span></button>
+            </div>
+            <div class="info">
+              <div><span>LEVEL</span><b id="infoLevel">–</b></div>
+              <div><span>NOTES</span><b id="infoNotes">–</b></div>
+              <div><span>BPM</span><b id="infoBpm">–</b></div>
+              <div><span>CHART</span><b id="infoSource" style="font-size:11px">–</b></div>
+            </div>
+            <div id="infoBreak"></div>
+          </div>
+        </div>
+
+        <!-- 오른쪽: 설정 + 조작법 -->
+        <div>
+          <h3>4. 설정</h3>
+          <div class="row"><label>노트 속도</label>
+            <input type="range" id="speed" min="2" max="12" step="0.1"><span class="val" id="speedVal"></span></div>
+          <div class="row"><label>판정 오프셋</label>
+            <input type="range" id="offset" min="-300" max="300" step="5"><span class="val" id="offsetVal"></span></div>
+          <div class="row"><label>BPM(내장)</label>
+            <input type="range" id="bpm" min="80" max="220" step="1"><span class="val" id="bpmVal"></span></div>
+          <div class="row"><label>음악 볼륨</label>
+            <input type="range" id="musicVol" min="0" max="1" step="0.02"><span class="val" id="musicVolVal"></span></div>
+          <div class="row"><label>타격음</label>
+            <input type="range" id="seVol" min="0" max="1" step="0.02"><span class="val" id="seVolVal"></span></div>
+
+          <div class="checks">
+            <label><input type="checkbox" id="flickSimple">플릭 간소화</label>
+            <label><input type="checkbox" id="noFail">체력 무한</label>
+            <label><input type="checkbox" id="autoPlay">오토 플레이</label>
+            <label><input type="checkbox" id="showBars" checked>마디선</label>
+            <label><input type="checkbox" id="showKeys" checked>키 표시</label>
+          </div>
+
+          <div style="margin-top:18px">
+            <h3>조작법</h3>
+            <div class="keyguide">
+              <b>레인</b> &nbsp;<kbd>S</kbd><kbd>D</kbd><kbd>F</kbd> &nbsp;<kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><br>
+              <b>플릭</b> &nbsp;레인 키 + <kbd>W</kbd><kbd>E</kbd><kbd>R</kbd><kbd>U</kbd><kbd>I</kbd><kbd>O</kbd> 또는 <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd>
+              &nbsp;<span style="opacity:.7">(간소화 시 레인 키만)</span><br>
+              <b>홀드</b> &nbsp;끝까지 누르고 있다가 끝점에서 떼기<br>
+              <b>슬라이드</b> &nbsp;리본을 따라 눌린 키를 옮기기<br>
+              <b>일시정지</b> &nbsp;<kbd>Esc</kbd> &nbsp;·&nbsp; <b>시작</b> <kbd>Enter</kbd><br>
+              <span style="opacity:.75">터치·마우스: 레인 탭 / 위로 스와이프 = 플릭 / 좌우 드래그 = 슬라이드</span>
+            </div>
+            <div class="legend">
+              <span><i style="background:linear-gradient(90deg,#63d3ff,#0e86c8)"></i>탭</span>
+              <span><i style="background:linear-gradient(90deg,#ff77b4,#c81c6d)"></i>플릭</span>
+              <span><i style="background:linear-gradient(90deg,#ffd166,#c98a12)"></i>홀드</span>
+              <span><i style="background:linear-gradient(90deg,#63f0a0,#12a05c)"></i>슬라이드</span>
+            </div>
+            <div class="note-box" style="margin-top:14px">
+              판정 폭: PERFECT ±42ms / GREAT ±78ms / GOOD ±112ms / BAD ±155ms —
+              프로세카보다 좁게 잡혀 있습니다. 처음엔 <b>판정 오프셋</b>을 맞추고 시작하세요.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="startBtn">▶ 재판 개정 (START)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 일시정지 ================= -->
+  <div id="pauseScreen" class="screen hidden">
+    <div class="card">
+      <div class="brand" style="justify-content:center"><h1>PAUSED</h1></div>
+      <div style="margin-top:20px">
+        <div class="row"><label>판정 오프셋</label>
+          <input type="range" id="pOffset" min="-300" max="300" step="5"><span class="val" id="pOffsetVal"></span></div>
+        <div class="row"><label>노트 속도</label>
+          <input type="range" id="pSpeed" min="2" max="12" step="0.1"><span class="val" id="pSpeedVal"></span></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="resumeBtn">계속하기</button>
+        <button class="btn" id="retryBtn">처음부터</button>
+        <button class="btn" id="quitBtn">나가기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 결과 ================= -->
+  <div id="resultScreen" class="screen hidden">
+    <div class="card">
+      <div id="rState">CLEAR</div>
+      <div class="rank" id="rRank">S</div>
+      <div id="rScore">0</div>
+      <div id="rBadge" class="hidden"></div>
+
+      <div class="judges">
+        <div class="j-p"><span>PERFECT</span><b id="rPerfect">0</b></div>
+        <div class="j-g"><span>GREAT</span><b id="rGreat">0</b></div>
+        <div class="j-o"><span>GOOD</span><b id="rGood">0</b></div>
+        <div class="j-b"><span>BAD</span><b id="rBad">0</b></div>
+        <div class="j-m"><span>MISS</span><b id="rMiss">0</b></div>
+      </div>
+      <div class="rstats">
+        <span>MAX COMBO<b id="rCombo">0</b></span>
+        <span>ACCURACY<b id="rAcc">0%</b></span>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="rRetryBtn">다시 하기</button>
+        <button class="btn" id="rQuitBtn">곡 선택으로</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 로딩 ================= -->
+  <div id="loading" class="hidden">
+    <div id="loadText">음원 분석 중…</div>
+    <div id="loadBarWrap"><div id="loadBar"></div></div>
+  </div>
+</div>
+
+<script src="js/util.js?v=6"></script>
+<script src="js/chart.js?v=6"></script>
+<script src="js/analyzer.js?v=6"></script>
+<script src="js/engine.js?v=6"></script>
+<script src="js/render.js?v=6"></script>
+<script src="js/input.js?v=6"></script>
+<script src="js/main.js?v=6"></script>
+</body>
+</html>
