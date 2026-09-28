@@ -8,9 +8,31 @@
 var Input = (function () {
   'use strict';
 
-  var LANE_KEYS = ['s', 'd', 'f', 'j', 'k', 'l'];
-  var FLICK_KEYS = ['w', 'e', 'r', 'u', 'i', 'o',
+  var DEFAULT_KEYS = ['s', 'd', 'f', 'j', 'k', 'l'];
+  var BASE_FLICK = ['w', 'e', 'r', 'u', 'i', 'o',
                     'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+
+  var LANE_KEYS = DEFAULT_KEYS.slice();
+  var FLICK_KEYS = BASE_FLICK.slice();
+  var labels = ['S', 'D', 'F', 'J', 'K', 'L'];   // 렌더러가 참조 -> 항상 제자리 수정
+
+  var PRETTY = {
+    arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→',
+    ' ': 'Space', control: 'Ctrl', shift: 'Shift', alt: 'Alt',
+    tab: 'Tab', enter: 'Enter', backspace: '⌫'
+  };
+  function keyLabel(k) {
+    if (PRETTY[k]) return PRETTY[k];
+    return k.length === 1 ? k.toUpperCase() : k;
+  }
+
+  /* 레인 키를 바꾸면 겹치는 플릭 키는 자동으로 빠진다 */
+  function setKeys(arr) {
+    LANE_KEYS = arr.slice(0, 6).map(function (k) { return String(k).toLowerCase(); });
+    FLICK_KEYS = BASE_FLICK.filter(function (k) { return LANE_KEYS.indexOf(k) < 0; });
+    labels.length = 0;
+    for (var i = 0; i < LANE_KEYS.length; i++) labels.push(keyLabel(LANE_KEYS[i]));
+  }
 
   var handler = null;        // { down(lane,t), up(lane,t), flick(t,lane), time() }
   var enabled = false;
@@ -114,7 +136,11 @@ var Input = (function () {
   return {
     attach: attach,
     setEnabled: setEnabled,
-    LANE_KEYS: LANE_KEYS,
-    labels: ['S', 'D', 'F', 'J', 'K', 'L']
+    setKeys: setKeys,
+    keyLabel: keyLabel,
+    keys: function () { return LANE_KEYS.slice(); },
+    flickKeys: function () { return FLICK_KEYS.slice(); },
+    DEFAULT_KEYS: DEFAULT_KEYS,
+    labels: labels
   };
 })();

@@ -257,6 +257,69 @@ h3 {
   margin-right: 5px; vertical-align: middle;
 }
 
+/* ---------------- 키 설정 ---------------- */
+.keybinds { display: flex; gap: 6px; }
+.kb {
+  flex: 1; min-width: 0; padding: 11px 4px;
+  border-radius: 10px; cursor: pointer; text-align: center;
+  border: 1px solid var(--line); background: rgba(255,255,255,.04);
+  color: var(--text); font-size: 14px; font-weight: 800;
+  transition: .12s; overflow: hidden; text-overflow: ellipsis;
+}
+.kb:hover { border-color: rgba(255,150,220,.5); background: rgba(255,92,157,.12); }
+.kb.listening {
+  background: linear-gradient(135deg, var(--pink-d), var(--pink));
+  border-color: transparent; color: #fff;
+  animation: kbPulse .9s ease-in-out infinite;
+}
+.kb.dup { border-color: #ff6b81; color: #ff6b81; }
+@keyframes kbPulse { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
+.keybind-help { font-size: 11px; color: var(--dim); margin-top: 7px; }
+.keybind-help a { color: var(--pink); text-decoration: none; }
+.keybind-help a:hover { text-decoration: underline; }
+
+/* ---------------- 가로 모드 안내 ---------------- */
+#rotateScreen {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 30px 26px;
+  background: radial-gradient(900px 600px at 50% 35%, rgba(90,20,80,.9), rgba(6,3,12,.98));
+}
+.rot-icon {
+  font-size: 62px; margin-bottom: 18px;
+  animation: rotHint 2.1s ease-in-out infinite;
+}
+@keyframes rotHint {
+  0%, 45%   { transform: rotate(0deg); }
+  60%, 100% { transform: rotate(-90deg); }
+}
+.rot-title { font-size: 19px; font-weight: 800; }
+.rot-sub { font-size: 12.5px; color: var(--dim); margin-top: 9px; line-height: 1.6; }
+
+/* 가로인데 화면이 너무 낮으면(폰 가로) 타이틀 카드를 압축 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .screen { padding: 10px; }
+  .card { padding: 14px 16px; border-radius: 14px; }
+  .brand h1 { font-size: 20px; }
+  .credit, .note-box, .keyguide { display: none; }
+  .grid { gap: 14px; margin-top: 10px; }
+  h3 { margin-bottom: 6px; }
+  .song-btn { padding: 7px 10px; }
+  .song-btn .ds { display: none; }
+  .diff-btn { padding: 6px 4px; }
+  .info div { padding: 6px 7px; }
+  .row { margin-bottom: 6px; }
+  .kb { padding: 8px 3px; }
+  /* 스크롤해도 START 는 항상 손에 닿게 */
+  .actions {
+    position: sticky; bottom: -14px; z-index: 5;
+    margin-top: 12px; padding: 10px 0 14px;
+    background: linear-gradient(180deg, rgba(24,14,38,0), rgba(24,14,38,.96) 22%);
+  }
+  .btn { padding: 10px 14px; }
+}
+
 /* ---------------- 버튼 ---------------- */
 .actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
 .btn {

@@ -28,7 +28,8 @@
     noFail: false,
     autoPlay: false,
     showBars: true,
-    showKeys: true
+    showKeys: true,
+    keys: ['s', 'd', 'f', 'j', 'k', 'l']
   };
 
   try {
@@ -77,6 +78,84 @@
 
   function elapsed() { return actx.currentTime - ctxStart + baseSeek; }
   function ctxTimeOf(e) { return ctxStart + e - baseSeek; }
+
+  /* ---------------- 키 설정 ---------------- */
+  var listening = -1;           // 재지정 대기 중인 레인 index
+
+  function applyKeys() {
+    Input.setKeys(S.keys);
+    var el = $('keyBinds');
+    if (el) {
+      var html = '';
+      for (var i = 0; i < 6; i++) {
+        html += '<button class="kb" data-lane="' + i + '">' +
+                Input.keyLabel(S.keys[i]) + '</button>';
+      }
+      el.innerHTML = html;
+      Array.prototype.forEach.call(el.querySelectorAll('.kb'), function (b) {
+        b.addEventListener('click', function () { beginListen(+b.dataset.lane); });
+      });
+    }
+    var g = $('guideLane');
+    if (g) {
+      g.innerHTML = S.keys.map(function (k, i) {
+        return (i === 3 ? '&nbsp; ' : '') + '<kbd>' + Input.keyLabel(k) + '</kbd>';
+      }).join('');
+    }
+    var f = $('guideFlick');
+    if (f) {
+      f.innerHTML = Input.flickKeys().map(function (k) {
+        return '<kbd>' + Input.keyLabel(k) + '</kbd>';
+      }).join('');
+    }
+  }
+
+  function beginListen(lane) {
+    listening = lane;
+    Array.prototype.forEach.call($('keyBinds').querySelectorAll('.kb'), function (b) {
+      b.classList.toggle('listening', +b.dataset.lane === lane);
+    });
+    $('keyBinds').querySelector('[data-lane="' + lane + '"]').textContent = '?';
+  }
+
+  function captureKey(e) {
+    if (listening < 0) return false;
+    e.preventDefault(); e.stopPropagation();
+    var k = e.key.toLowerCase();
+    if (k === 'escape') { listening = -1; applyKeys(); return true; }
+
+    /* 이미 다른 레인이 쓰는 키면 서로 맞바꾼다 */
+    var dup = S.keys.indexOf(k);
+    if (dup >= 0 && dup !== listening) S.keys[dup] = S.keys[listening];
+    S.keys[listening] = k;
+
+    listening = -1;
+    applyKeys(); save();
+    return true;
+  }
+
+  /* ---------------- 화면 방향 ---------------- */
+  function isTouch() {
+    return (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
+  }
+  function updateOrientation() {
+    var portrait = window.innerHeight > window.innerWidth;
+    var need = isTouch() && portrait;
+    $('rotateScreen').classList.toggle('hidden', !need);
+    if (need && playing && !paused) pause();      // 플레이 중 세로로 돌리면 일시정지
+  }
+  function goLandscape() {
+    if (!isTouch()) return;
+    var el = document.documentElement;
+    var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    var p = null;
+    try { if (req) p = req.call(el); } catch (e) {}
+    Promise.resolve(p).then(function () {
+      if (screen.orientation && screen.orientation.lock) {
+        return screen.orientation.lock('landscape');
+      }
+    }).catch(function () { /* iOS 등 잠금 미지원 -> 안내 오버레이가 대신 처리 */ });
+  }
 
   /* ---------------- 화면 ---------------- */
   function hideAll() {
@@ -389,6 +468,7 @@
     function relayout() {
       Renderer.resize();
       Renderer.draw(game, game ? (playing ? elapsed() - S.offset / 1000 : frozenT) : 0, viewSettings());
+      updateOrientation();
     }
     window.addEventListener('resize', relayout);
     /* 숨겨진 탭/패널에서 열리면 최초 레이아웃 시점에 크기가 0이다.
@@ -509,7 +589,10 @@
     toggle('showKeys', 'showKeys');
 
     /* 버튼 */
-    $('startBtn').addEventListener('click', function () { start(null); });
+    $('startBtn').addEventListener('click', function () {
+      goLandscape();                 // 클릭이 사용자 제스처라 전체화면·방향잠금이 여기서만 먹는다
+      start(null);
+    });
     $('resumeBtn').addEventListener('click', resume);
     $('retryBtn').addEventListener('click', function () {
       $('pauseScreen').classList.add('hidden'); start(null);
@@ -521,7 +604,24 @@
     $('rQuitBtn').addEventListener('click', quit);
     $('pauseBtn').addEventListener('click', pause);
 
+    /* 키 재지정: 캡처 단계에서 가로채 게임 입력보다 먼저 처리 */
     window.addEventListener('keydown', function (e) {
+      captureKey(e);
+    }, true);
+    $('keyReset').addEventListener('click', function (e) {
+      e.preventDefault();
+      S.keys = Input.DEFAULT_KEYS.slice();
+      listening = -1;
+      applyKeys(); save();
+    });
+    $('fsBtn').addEventListener('click', goLandscape);
+    window.addEventListener('orientationchange', updateOrientation);
+    if (screen.orientation) {
+      screen.orientation.addEventListener('change', updateOrientation);
+    }
+
+    window.addEventListener('keydown', function (e) {
+      if (listening >= 0) return;
       if (e.key === 'Escape') {
         if (playing && !paused) pause();
         else if (paused) resume();
@@ -537,6 +637,9 @@
     $('modeAuto').disabled = true;
     $('analyzeBtn').disabled = true;
     S.chartMode = 'builtin';
+    if (!Array.isArray(S.keys) || S.keys.length !== 6) S.keys = Input.DEFAULT_KEYS.slice();
+    applyKeys();
+    updateOrientation();
     if (S.songId !== 'file' && !Songs.byId(S.songId)) S.songId = Songs.LIST[0].id;
     selectSong(S.songId);
     Renderer.draw(null, 0, viewSettings());

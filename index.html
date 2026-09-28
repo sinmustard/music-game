@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>연애재판 — RHYTHM COURT</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=15">
 </head>
 <body>
 <div id="app">
@@ -122,10 +122,19 @@
           </div>
 
           <div style="margin-top:18px">
+            <h3>6. 키 설정</h3>
+            <div class="keybinds" id="keyBinds"></div>
+            <div class="keybind-help">
+              칸을 누른 뒤 원하는 키를 입력하세요 ·
+              <a href="#" id="keyReset">기본값(SDF JKL)으로</a>
+            </div>
+          </div>
+
+          <div style="margin-top:18px">
             <h3>조작법</h3>
             <div class="keyguide">
-              <b>레인</b> &nbsp;<kbd>S</kbd><kbd>D</kbd><kbd>F</kbd> &nbsp;<kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><br>
-              <b>플릭</b> &nbsp;레인 키 + <kbd>W</kbd><kbd>E</kbd><kbd>R</kbd><kbd>U</kbd><kbd>I</kbd><kbd>O</kbd> 또는 <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd>
+              <b>레인</b> &nbsp;<span id="guideLane"></span><br>
+              <b>플릭</b> &nbsp;레인 키 + <span id="guideFlick"></span>
               &nbsp;<span style="opacity:.7">(간소화 시 레인 키만)</span><br>
               <b>홀드</b> &nbsp;끝까지 누르고 있다가 끝점에서 떼기<br>
               <b>슬라이드</b> &nbsp;리본을 따라 눌린 키를 옮기기<br>
@@ -197,6 +206,16 @@
     </div>
   </div>
 
+  <!-- ================= 가로 모드 안내 ================= -->
+  <div id="rotateScreen" class="hidden">
+    <div class="rot-icon">📱</div>
+    <div class="rot-title">기기를 가로로 돌려주세요</div>
+    <div class="rot-sub">6개 레인을 편하게 누르려면 가로 화면이 필요합니다.</div>
+    <button class="btn primary" id="fsBtn" style="margin-top:22px;max-width:260px">
+      전체화면으로 전환
+    </button>
+  </div>
+
   <!-- ================= 로딩 ================= -->
   <div id="loading" class="hidden">
     <div id="loadText">음원 분석 중…</div>
@@ -204,14 +223,14 @@
   </div>
 </div>
 
-<script src="js/util.js?v=13"></script>
-<script src="js/chart.js?v=13"></script>
-<script src="js/synth.js?v=13"></script>
-<script src="js/songs.js?v=13"></script>
-<script src="js/analyzer.js?v=13"></script>
-<script src="js/engine.js?v=13"></script>
-<script src="js/render.js?v=13"></script>
-<script src="js/input.js?v=13"></script>
-<script src="js/main.js?v=13"></script>
+<script src="js/util.js?v=15"></script>
+<script src="js/chart.js?v=15"></script>
+<script src="js/synth.js?v=15"></script>
+<script src="js/songs.js?v=15"></script>
+<script src="js/analyzer.js?v=15"></script>
+<script src="js/engine.js?v=15"></script>
+<script src="js/render.js?v=15"></script>
+<script src="js/input.js?v=15"></script>
+<script src="js/main.js?v=15"></script>
 </body>
 </html>
