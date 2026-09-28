@@ -274,6 +274,18 @@
   }
 
   /* ---------------- 파일 로딩 ---------------- */
+  function onBufferReady(name, buf) {
+    buffer = buf;
+    fileLabel = name;
+    $('fileName').textContent = name + '  (' + U.mmss(buf.duration) + ')';
+    $('dropZone').classList.add('loaded');
+    $('analyzeBtn').disabled = false;
+    $('analyzeBtn').classList.add('primary');
+    $('modeAuto').disabled = false;
+    $('audioState').textContent = '음원 로드됨';
+    updateChartInfo();
+  }
+
   function loadFile(file) {
     if (!file) return;
     ensureAudio();
@@ -281,19 +293,37 @@
     var fr = new FileReader();
     fr.onload = function () {
       actx.decodeAudioData(fr.result.slice(0), function (buf) {
-        buffer = buf;
-        fileLabel = file.name;
-        $('fileName').textContent = file.name + '  (' + U.mmss(buf.duration) + ')';
-        $('dropZone').classList.add('loaded');
-        $('analyzeBtn').disabled = false;
-        $('modeAuto').disabled = false;
-        $('audioState').textContent = '음원 로드됨';
-        updateChartInfo();
+        onBufferReady(file.name, buf);
       }, function () {
         $('fileName').textContent = '디코딩 실패 — mp3/ogg/wav/m4a 파일을 사용해 주세요.';
       });
     };
     fr.readAsArrayBuffer(file);
+  }
+
+  /* audio/song.mp3 이 있으면 자동으로 불러온다.
+     fetch 는 file:// 에서 차단되므로 http 로 열었을 때만 동작한다. */
+  function autoLoadSong() {
+    if (location.protocol !== 'http:' && location.protocol !== 'https:') {
+      $('audioState').textContent = '음원 없음 (file:// 에서는 자동 로드 불가)';
+      return;
+    }
+    $('fileName').textContent = 'audio/song.mp3 불러오는 중…';
+    fetch('audio/song.mp3').then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.arrayBuffer();
+    }).then(function (ab) {
+      ensureAudio();
+      return new Promise(function (ok, no) { actx.decodeAudioData(ab, ok, no); });
+    }).then(function (buf) {
+      onBufferReady('audio/song.mp3', buf);
+      /* 내장 채보는 BPM 고정이라 이 파일과 안 맞을 수 있다.
+         번들 음원은 바로 분석해서 곡에 맞는 채보를 띄운다. */
+      runAnalysis();
+    }).catch(function () {
+      $('fileName').textContent = '';
+      $('audioState').textContent = '음원 없음';
+    });
   }
 
   function runAnalysis() {
@@ -310,7 +340,7 @@
         $('modeAuto').checked = true;
         $('loading').classList.add('hidden');
         $('analyzeState').textContent =
-          '분석 완료 · 추정 BPM ' + res.bpm.toFixed(2) + ' · 온셋 ' + res.peaks.length + '개';
+          '분석 완료 · 검출 BPM ' + res.bpm.toFixed(2) + ' · 온셋 ' + res.peaks.length + '개';
         updateChartInfo();
         save();
       });
@@ -457,6 +487,7 @@
     S.chartMode = 'builtin';
     updateChartInfo();
     Renderer.draw(null, 0, viewSettings());
+    autoLoadSong();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);

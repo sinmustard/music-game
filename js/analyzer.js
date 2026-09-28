@@ -36,52 +36,60 @@ var Analyzer = (function () {
   /* --------------------------------------------------------
      1) STFT + 밴드별 스펙트럴 플럭스 (청크 처리)
      -------------------------------------------------------- */
-  function computeFlux(mono, onProgress, done) {
-    var data = mono.data, sr = mono.sr;
-    var frames = Math.max(1, Math.floor((data.length - N) / HOP));
-    var win = U.hann(N);
-    var half = N >> 1;
+  function fluxState(mono) {
+    var frames = Math.max(1, Math.floor((mono.data.length - N) / HOP));
+    var binHz = mono.sr / N;
+    return {
+      data: mono.data, sr: mono.sr, frames: frames, f: 0,
+      win: U.hann(N), half: N >> 1,
+      prev: new Float32Array(N >> 1),
+      flux: new Float32Array(frames),
+      low: new Float32Array(frames),
+      mid: new Float32Array(frames),
+      high: new Float32Array(frames),
+      iLow: Math.max(1, Math.round(30 / binHz)),
+      iMid: Math.round(250 / binHz),
+      iHigh: Math.round(2200 / binHz),
+      re: new Float32Array(N), im: new Float32Array(N)
+    };
+  }
 
-    var prev = new Float32Array(half);
-    var flux = new Float32Array(frames);
-    var bLow = new Float32Array(frames);
-    var bMid = new Float32Array(frames);
-    var bHigh = new Float32Array(frames);
+  /* [s.f, to) 구간의 프레임을 채운다 */
+  function fluxRange(s, to) {
+    var re = s.re, im = s.im, data = s.data, win = s.win;
+    for (; s.f < to; s.f++) {
+      var off = s.f * HOP, k;
+      for (k = 0; k < N; k++) { re[k] = data[off + k] * win[k]; im[k] = 0; }
+      U.fft(re, im);
 
-    var binHz = sr / N;
-    var iLow = Math.max(1, Math.round(30 / binHz));
-    var iMid = Math.round(250 / binHz);
-    var iHigh = Math.round(2200 / binHz);
-
-    var re = new Float32Array(N), im = new Float32Array(N);
-    var f = 0;
-
-    function chunk() {
-      var end = Math.min(frames, f + 300);
-      for (; f < end; f++) {
-        var off = f * HOP, k;
-        for (k = 0; k < N; k++) { re[k] = data[off + k] * win[k]; im[k] = 0; }
-        U.fft(re, im);
-
-        var tot = 0, lo = 0, mi = 0, hi = 0;
-        for (k = iLow; k < half; k++) {
-          var mag = Math.sqrt(re[k] * re[k] + im[k] * im[k]);
-          var d = mag - prev[k];
-          if (d > 0) {
-            tot += d;
-            if (k < iMid) lo += d;
-            else if (k < iHigh) mi += d;
-            else hi += d;
-          }
-          prev[k] = mag;
+      var tot = 0, lo = 0, mi = 0, hi = 0;
+      for (k = s.iLow; k < s.half; k++) {
+        var mag = Math.sqrt(re[k] * re[k] + im[k] * im[k]);
+        var d = mag - s.prev[k];
+        if (d > 0) {
+          tot += d;
+          if (k < s.iMid) lo += d;
+          else if (k < s.iHigh) mi += d;
+          else hi += d;
         }
-        flux[f] = tot; bLow[f] = lo; bMid[f] = mi; bHigh[f] = hi;
+        s.prev[k] = mag;
       }
-      if (onProgress) onProgress(f / frames);
-      if (f < frames) setTimeout(chunk, 0);
-      else done({ flux: flux, low: bLow, mid: bMid, high: bHigh, frames: frames, sr: sr });
+      s.flux[s.f] = tot; s.low[s.f] = lo; s.mid[s.f] = mi; s.high[s.f] = hi;
     }
-    chunk();
+  }
+
+  /* 청크가 너무 잘면 백그라운드 탭에서 setTimeout 이 초 단위로
+     throttle 되어 분석이 수십 초로 늘어난다. */
+  var CHUNK = 1200;
+
+  function computeFlux(mono, onProgress, done) {
+    var s = fluxState(mono);
+    (function chunk() {
+      fluxRange(s, Math.min(s.frames, s.f + CHUNK));
+      if (onProgress) onProgress(s.f / s.frames);
+      if (s.f < s.frames) setTimeout(chunk, 0);
+      else done(s);
+    })();
   }
 
   /* 이동평균 대비 정규화 */
@@ -141,26 +149,76 @@ var Analyzer = (function () {
   /* --------------------------------------------------------
      3) BPM / 위상 추정
      -------------------------------------------------------- */
+  var MIN_BPM = 100, MAX_BPM = 210;
+
   function estimateTempo(env, sr, hintBpm) {
     var frameSec = HOP / sr;
+    /* 모든 후보 BPM이 "같은 구간"을 보게 고정한다.
+       구간 길이를 lag 에 맡기면 느린 BPM일수록 표본이 줄어
+       점수가 부풀려져 느린 템포로 편향된다. */
+    var maxLag = (60 / MIN_BPM) / frameSec;
+    var limit = Math.max(1, env.length - Math.ceil(maxLag * 2) - 2);
     var best = { bpm: hintBpm || 150, score: -1 };
 
-    for (var bpm = 100; bpm <= 210; bpm += 0.25) {
+    for (var bpm = MIN_BPM; bpm <= MAX_BPM; bpm += 0.25) {
       var lag = (60 / bpm) / frameSec;
-      var s = 0, cnt = 0;
-      for (var i = 0; i + lag * 4 < env.length; i += 3) {
+      var s = 0;
+      for (var i = 0; i < limit; i += 2) {
         var a = env[i];
         if (a <= 0) continue;
-        s += a * (env[Math.round(i + lag)] || 0) + a * 0.6 * (env[Math.round(i + lag * 2)] || 0);
-        cnt++;
+        s += a * (env[Math.round(i + lag)] || 0)
+           + a * 0.6 * (env[Math.round(i + lag * 2)] || 0);
       }
-      if (!cnt) continue;
-      s /= cnt;
-      /* 힌트 BPM 근처에 약한 가중 */
-      if (hintBpm) s *= 1 + 0.25 * Math.exp(-Math.pow((bpm - hintBpm) / 12, 2));
+      /* 힌트 BPM 근처에 약한 가중 (강한 진짜 피크를 뒤집을 정도는 아니다) */
+      if (hintBpm) s *= 1 + 0.30 * Math.exp(-Math.pow((bpm - hintBpm) / 10, 2));
       if (s > best.score) best = { bpm: bpm, score: s };
     }
     return best.bpm;
+  }
+
+  /* --------------------------------------------------------
+     3-b) 정밀 BPM — 온셋이 16분 격자에 얼마나 위상 고정되는지(원형 평균)
+     자기상관은 0.25 BPM 해상도로도 1 BPM 가까이 틀릴 수 있는데,
+     3분 40초 곡에서 0.75 BPM 오차면 곡 끝에서 3비트가 밀린다.
+     -------------------------------------------------------- */
+  function gridFit(peaks, bpm) {
+    var sub = 60 / bpm / 4;
+    var cr = 0, ci = 0, w = 0;
+    for (var i = 0; i < peaks.length; i++) {
+      var a = 2 * Math.PI * peaks[i].t / sub;
+      var wt = peaks[i].v;                    // 강한 타점일수록 신뢰
+      cr += wt * Math.cos(a); ci += wt * Math.sin(a); w += wt;
+    }
+    if (!w) return { R: 0, phase: 0, bpm: bpm };
+    var ph = Math.atan2(ci, cr) / (2 * Math.PI) * sub;
+    while (ph < 0) ph += sub;
+    return { R: Math.sqrt(cr * cr + ci * ci) / w, phase: ph, bpm: bpm };
+  }
+
+  /* 배음(2배·1/2배) 혼동을 피하려고 자기상관 결과 근처만 훑는다 */
+  function refineTempo(peaks, coarse) {
+    var lo = Math.max(MIN_BPM, coarse - 5), hi = Math.min(MAX_BPM, coarse + 5);
+    var best = gridFit(peaks, coarse);
+    for (var bpm = lo; bpm <= hi; bpm += 0.05) {
+      var f = gridFit(peaks, bpm);
+      if (f.R > best.R) best = f;
+    }
+    return best;
+  }
+
+  /* 16분 격자 위상 -> 그중 실제 박(拍)에 해당하는 것 고르기 */
+  function pickBeatPhase(peaks, bpm, phase16) {
+    var beat = 60 / bpm, sub = beat / 4;
+    var best = { s: -1, ph: phase16 };
+    for (var k = 0; k < 4; k++) {
+      var ph = phase16 + k * sub, s = 0;
+      for (var i = 0; i < peaks.length; i++) {
+        var r = (peaks[i].t - ph) / beat;
+        if (Math.abs(r - Math.round(r)) * beat < 0.035) s += peaks[i].v;
+      }
+      if (s > best.s) best = { s: s, ph: ph };
+    }
+    return best.ph;
   }
 
   function estimatePhase(env, sr, bpm) {
@@ -288,22 +346,39 @@ var Analyzer = (function () {
   /* --------------------------------------------------------
      public
      -------------------------------------------------------- */
+  /* 스펙트럼이 준비된 뒤의 공통 마무리 */
+  function finish(spec, hintBpm) {
+    var env = normalize(spec.flux);
+    var peaks = pickPeaks(env, spec);
+    var coarse = estimateTempo(env, spec.sr, hintBpm);      // 자기상관(대략)
+    var fit = refineTempo(peaks, coarse);                    // 격자 정렬(정밀)
+    var phase = pickBeatPhase(peaks, fit.bpm, fit.phase);
+    return {
+      bpm: Math.round(fit.bpm * 100) / 100,
+      phase: phase,
+      coarseBpm: coarse,
+      fitR: fit.R,
+      peaks: peaks
+    };
+  }
+
   function analyze(audioBuffer, hintBpm, onProgress, done) {
-    var mono = toMono(audioBuffer);
-    computeFlux(mono, function (p) { onProgress(p * 0.8); }, function (spec) {
-      var env = normalize(spec.flux);
-      onProgress(0.85);
-      setTimeout(function () {
-        var bpm = estimateTempo(env, spec.sr, hintBpm);
-        onProgress(0.93);
+    computeFlux(toMono(audioBuffer), function (p) { onProgress(p * 0.85); },
+      function (spec) {
+        onProgress(0.9);
         setTimeout(function () {
-          var phase = estimatePhase(env, spec.sr, bpm);
-          var peaks = pickPeaks(env, spec);
+          var res = finish(spec, hintBpm);
           onProgress(1);
-          done({ bpm: Math.round(bpm * 100) / 100, phase: phase, peaks: peaks });
+          done(res);
         }, 0);
-      }, 0);
-    });
+      });
+  }
+
+  /* 타이머 없이 한 번에 처리 (테스트·오프라인용) */
+  function analyzeSync(audioBuffer, hintBpm) {
+    var s = fluxState(toMono(audioBuffer));
+    fluxRange(s, s.frames);
+    return finish(s, hintBpm);
   }
 
   function makeChart(analysis, diff) {
@@ -321,5 +396,5 @@ var Analyzer = (function () {
     };
   }
 
-  return { analyze: analyze, makeChart: makeChart };
+  return { analyze: analyze, analyzeSync: analyzeSync, makeChart: makeChart };
 })();
