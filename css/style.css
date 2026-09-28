@@ -152,6 +152,33 @@ h3 {
   border-left: 2px solid var(--gold); padding: 9px 11px; border-radius: 0 8px 8px 0;
 }
 
+/* ---------------- 곡 선택 ---------------- */
+.songs { display: flex; flex-direction: column; gap: 6px; }
+.song-btn {
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 13px; border-radius: 12px; cursor: pointer; text-align: left;
+  border: 1px solid var(--line); background: rgba(255,255,255,.03);
+  color: var(--dim); transition: .12s; width: 100%;
+}
+.song-btn:hover { color: var(--text); border-color: rgba(255,150,220,.45); }
+.song-btn.on {
+  background: linear-gradient(135deg, rgba(195,30,102,.55), rgba(255,92,157,.45));
+  color: #fff; border-color: rgba(255,150,220,.6);
+}
+.song-btn .ic { font-size: 17px; flex: none; }
+.song-btn .tx { flex: 1; min-width: 0; }
+.song-btn .nm { font-size: 13px; font-weight: 700; }
+.song-btn .ds { font-size: 10.5px; opacity: .78; margin-top: 1px; }
+.song-btn .bp {
+  font-size: 10px; font-weight: 700; flex: none;
+  padding: 3px 8px; border-radius: 99px; background: rgba(0,0,0,.28);
+}
+.free-tag {
+  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 99px;
+  background: rgba(99,240,160,.18); color: var(--green);
+  font-size: 9px; font-weight: 800; letter-spacing: .06em; vertical-align: middle;
+}
+
 /* ---------------- 난이도 ---------------- */
 .diffs { display: flex; gap: 7px; flex-wrap: wrap; }
 .diff-btn {

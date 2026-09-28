@@ -8,7 +8,7 @@
 
   /* ---------------- 상태 ---------------- */
   var actx = null, musicGain = null, seGain = null, noiseBuf = null;
-  var buffer = null, src = null;
+  var buffer = null, src = null, fileBuffer = null;
   var ctxStart = 0, baseSeek = 0;
   var playing = false, paused = false, pauseAt = 0;
   var game = null, chart = null, analysis = null;
@@ -17,6 +17,7 @@
 
   var S = {
     diff: 'APPEND',
+    songId: 'verdict',         // 'file' 또는 Songs.LIST 의 id
     chartMode: 'builtin',      // builtin | auto
     speed: 5.2,
     offset: 0,                 // ms (+ = 노트가 늦게)
@@ -85,13 +86,43 @@
   }
 
   /* ---------------- 채보 준비 ---------------- */
+  function curSong() { return S.songId === 'file' ? null : Songs.byId(S.songId); }
+
   function buildChart() {
-    if (S.chartMode === 'auto' && analysis) {
+    var song = curSong();
+    if (song) {
+      /* 내장곡은 멜로디 음표 시각을 알고 있으므로 분석이 필요 없다 */
+      chart = Songs.chart(song, S.diff);
+    } else if (S.chartMode === 'auto' && analysis) {
       chart = Analyzer.makeChart(analysis, S.diff);
     } else {
       chart = Charts.build(S.diff, S.bpm, 60 / S.bpm * 8);   // 2마디 리드인
     }
     return chart;
+  }
+
+  /* 곡 선택 — 내장곡이면 합성해서 buffer 로 쓴다 */
+  function selectSong(id) {
+    S.songId = id;
+    save();
+    var song = curSong();
+    Array.prototype.forEach.call(document.querySelectorAll('.song-btn'), function (b) {
+      b.classList.toggle('on', b.dataset.song === id);
+    });
+    $('fileSection').classList.toggle('hidden', !!song);
+
+    if (!song) { buffer = fileBuffer; updateChartInfo(); return; }
+
+    ensureAudio();
+    $('loading').classList.remove('hidden');
+    $('loadText').textContent = '「' + song.title + '」 합성 중…';
+    $('loadBar').style.width = '35%';
+    setTimeout(function () {
+      buffer = Songs.render(song, actx).buffer;   // 두 번째부터는 캐시
+      $('loadBar').style.width = '100%';
+      $('loading').classList.add('hidden');
+      updateChartInfo();
+    }, 30);
   }
 
   function updateChartInfo() {
@@ -124,7 +155,9 @@
       seek = 0;
       lastHit = 0;
       completeAt = 0;
-      $('hudSong').textContent = '연애재판' + (fileLabel ? '' : '  (메트로놈 모드)');
+      var song = curSong();
+      $('hudSong').textContent = song ? song.title
+        : ('연애재판' + (fileLabel ? '' : '  (메트로놈 모드)'));
       $('hudSub').textContent =
         S.diff + ' Lv.' + chart.level + ' · ' + U.comma(game.total) + ' NOTES · ' + chart.source;
     }
@@ -275,7 +308,8 @@
 
   /* ---------------- 파일 로딩 ---------------- */
   function onBufferReady(name, buf) {
-    buffer = buf;
+    fileBuffer = buf;
+    if (S.songId === 'file') buffer = buf;
     fileLabel = name;
     $('fileName').textContent = name + '  (' + U.mmss(buf.duration) + ')';
     $('dropZone').classList.add('loaded');
@@ -318,8 +352,8 @@
     }).then(function (buf) {
       onBufferReady('audio/song.mp3', buf);
       /* 내장 채보는 BPM 고정이라 이 파일과 안 맞을 수 있다.
-         번들 음원은 바로 분석해서 곡에 맞는 채보를 띄운다. */
-      runAnalysis();
+         내 음원을 고른 상태일 때만 바로 분석해서 곡에 맞춘다. */
+      if (S.songId === 'file') runAnalysis();
     }).catch(function () {
       $('fileName').textContent = '';
       $('audioState').textContent = '음원 없음';
@@ -366,6 +400,24 @@
       up: function (l, t) { if (game) game.laneUp(l, t); },
       flick: function (t, l) { if (game) game.flickInput(t, l); },
       time: function () { return elapsed() - S.offset / 1000; }
+    });
+
+    /* 곡 목록 */
+    var listEl = $('songList'), html = '';
+    Songs.LIST.forEach(function (s) {
+      html += '<button class="song-btn" data-song="' + s.id + '">' +
+        '<span class="ic">🎼</span><span class="tx"><span class="nm">' + s.title +
+        '<span class="free-tag">자유 이용</span></span>' +
+        '<span class="ds">' + s.sub + '</span></span>' +
+        '<span class="bp">' + s.bpm + '</span></button>';
+    });
+    html += '<button class="song-btn" data-song="file">' +
+      '<span class="ic">📂</span><span class="tx"><span class="nm">내 음원 파일</span>' +
+      '<span class="ds">audio/song.mp3 또는 직접 선택 · 자동 분석 채보</span></span>' +
+      '<span class="bp">?</span></button>';
+    listEl.innerHTML = html;
+    Array.prototype.forEach.call(listEl.querySelectorAll('.song-btn'), function (b) {
+      b.addEventListener('click', function () { selectSong(b.dataset.song); });
     });
 
     /* 난이도 */
@@ -485,7 +537,8 @@
     $('modeAuto').disabled = true;
     $('analyzeBtn').disabled = true;
     S.chartMode = 'builtin';
-    updateChartInfo();
+    if (S.songId !== 'file' && !Songs.byId(S.songId)) S.songId = Songs.LIST[0].id;
+    selectSong(S.songId);
     Renderer.draw(null, 0, viewSettings());
     autoLoadSong();
   }

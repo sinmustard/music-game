@@ -42,9 +42,13 @@
       </p>
 
       <div class="grid">
-        <!-- 왼쪽: 음원 + 난이도 -->
+        <!-- 왼쪽: 곡 + 음원 + 난이도 -->
         <div>
-          <h3>1. 음원</h3>
+          <h3>1. 곡 선택</h3>
+          <div class="songs" id="songList"></div>
+
+          <div id="fileSection" style="margin-top:18px">
+          <h3>2. 내 음원 파일</h3>
           <div id="dropZone">
             <div class="big">🎵 음악 파일을 여기에 끌어다 놓기</div>
             <div class="small">클릭해서 선택도 가능 · mp3 / ogg / wav / m4a<br>
@@ -60,7 +64,7 @@
           </div>
 
           <div style="margin-top:18px">
-            <h3>2. 채보 방식</h3>
+            <h3>3. 채보 방식</h3>
             <div class="radios">
               <label><input type="radio" name="cmode" id="modeBuiltin" checked><span>내장 채보 (BPM 고정)</span></label>
               <label><input type="radio" name="cmode" id="modeAuto" disabled><span>오디오 자동 분석</span></label>
@@ -74,9 +78,10 @@
               곡과 정확히 맞아떨어집니다. (3~4분 곡 기준 5~15초 소요)
             </div>
           </div>
+          </div><!-- /fileSection -->
 
           <div style="margin-top:18px">
-            <h3>3. 난이도</h3>
+            <h3>4. 난이도</h3>
             <div class="diffs">
               <button class="diff-btn" data-diff="NORMAL">NORMAL<span class="lv">14</span></button>
               <button class="diff-btn" data-diff="HARD">HARD<span class="lv">20</span></button>
@@ -96,7 +101,7 @@
 
         <!-- 오른쪽: 설정 + 조작법 -->
         <div>
-          <h3>4. 설정</h3>
+          <h3>5. 설정</h3>
           <div class="row"><label>노트 속도</label>
             <input type="range" id="speed" min="2" max="12" step="0.1"><span class="val" id="speedVal"></span></div>
           <div class="row"><label>판정 오프셋</label>
@@ -199,12 +204,14 @@
   </div>
 </div>
 
-<script src="js/util.js?v=11"></script>
-<script src="js/chart.js?v=11"></script>
-<script src="js/analyzer.js?v=11"></script>
-<script src="js/engine.js?v=11"></script>
-<script src="js/render.js?v=11"></script>
-<script src="js/input.js?v=11"></script>
-<script src="js/main.js?v=11"></script>
+<script src="js/util.js?v=13"></script>
+<script src="js/chart.js?v=13"></script>
+<script src="js/synth.js?v=13"></script>
+<script src="js/songs.js?v=13"></script>
+<script src="js/analyzer.js?v=13"></script>
+<script src="js/engine.js?v=13"></script>
+<script src="js/render.js?v=13"></script>
+<script src="js/input.js?v=13"></script>
+<script src="js/main.js?v=13"></script>
 </body>
 </html>
